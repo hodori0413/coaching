@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0F1419">
+<title>운동 자세 코치</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root{
+    --ink:#0F1419; --surface:#18202A; --surface-2:#212C38; --line:#2E3C4A;
+    --text:#E9EFF5; --muted:#8698A8;
+    --accent:#4DA3FF; --good:#4FE3A6; --warn:#FFB454; --bad:#FF7A7A; --cal:#C58BFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overscroll-behavior:none}
+  body{
+    background:var(--ink);color:var(--text);
+    font-family:Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;overflow:hidden;touch-action:manipulation;
+  }
+  #app{height:100dvh;min-height:100vh;display:flex;flex-direction:column;max-width:640px;margin:0 auto;position:relative}
+
+  header{
+    display:flex;align-items:center;gap:8px;
+    padding:12px 14px;padding-top:max(12px,env(safe-area-inset-top));
+    border-bottom:1px solid var(--line);flex:0 0 auto;
+  }
+  .title{font-size:15px;font-weight:700;letter-spacing:-.02em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .title span{color:var(--muted);font-weight:500}
+  header .spacer{flex:1}
+  .icon-btn{
+    width:38px;height:38px;border:1px solid var(--line);background:var(--surface);
+    color:var(--text);border-radius:11px;display:grid;place-items:center;
+    cursor:pointer;font-size:16px;flex:0 0 auto;font-family:inherit;
+  }
+  .icon-btn:active{background:var(--surface-2)}
+  .icon-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  #stage{position:relative;flex:1 1 auto;background:#000;overflow:hidden;min-height:0}
+  #cam,#overlay{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  #cam{opacity:.9}
+
+  .hud{
+    position:absolute;background:rgba(15,20,25,.66);
+    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,.09);border-radius:14px;
+  }
+  #repBox{top:12px;left:12px;display:flex;align-items:baseline;gap:6px;padding:8px 14px 10px}
+  #repCount{font-size:34px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+  #repBox .lbl{font-size:11px;color:var(--muted);font-weight:600}
+  #repBox.calib #repCount{color:var(--cal)}
+
+  #gauge{
+    top:12px;right:12px;padding:9px 12px;
+    display:grid;grid-template-columns:auto auto auto;gap:3px 9px;
+    font-size:11.5px;font-variant-numeric:tabular-nums;
+  }
+  #gauge .k{color:var(--muted);font-weight:500}
+  #gauge .v{text-align:right;font-weight:700}
+  #gauge .t{text-align:right;font-weight:500;color:var(--accent)}
+  #gauge .hd{color:var(--muted);font-size:9.5px;font-weight:600;padding-bottom:2px}
+
+  #cue{
+    position:absolute;left:10px;right:10px;bottom:10px;
+    background:rgba(15,20,25,.76);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.09);border-left:4px solid var(--muted);
+    border-radius:14px;padding:13px 15px;
+    font-size:19px;font-weight:700;line-height:1.35;letter-spacing:-.02em;
+  }
+  #cue.good{border-left-color:var(--good)}
+  #cue.warn{border-left-color:var(--warn)}
+  #cue.bad{border-left-color:var(--bad)}
+  #cue.cal{border-left-color:var(--cal)}
+  #cue small{display:block;font-size:12.5px;font-weight:500;color:var(--muted);margin-top:4px;letter-spacing:0}
+
+  .sheet{position:absolute;inset:0;background:var(--ink);z-index:20;display:flex;flex-direction:column}
+  .sheet[hidden]{display:none}
+  .sheet .head{
+    display:flex;align-items:center;gap:12px;padding:13px 16px;
+    padding-top:max(13px,env(safe-area-inset-top));border-bottom:1px solid var(--line);flex:0 0 auto;
+  }
+  .sheet .head h2{font-size:16.5px;font-weight:700;flex:1;letter-spacing:-.02em}
+  .sheet .body{padding:20px 18px 32px;overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
+  .center{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;min-height:100%}
+
+  h1.big{font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1.3}
+  p.sub{color:var(--muted);font-size:14.5px;line-height:1.7;max-width:34ch}
+  p.fine{color:var(--muted);font-size:12.5px;line-height:1.65;max-width:34ch}
+  ol.steps{color:var(--muted);font-size:14px;line-height:1.9;text-align:left;max-width:32ch}
+  ol.steps li{margin-left:18px}
+  b.hi{color:var(--text)}
+
+  .primary{
+    background:var(--accent);color:#06121F;border:0;border-radius:13px;
+    padding:15px 28px;font-size:16px;font-weight:700;font-family:inherit;cursor:pointer;
+  }
+  .primary.cal{background:var(--cal);color:#160B24}
+  .primary:disabled{opacity:.5}
+  .primary:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+  .ghost{
+    background:transparent;color:var(--muted);border:1px solid var(--line);
+    border-radius:13px;padding:13px 22px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;
+  }
+
+  #log{
+    flex:0 0 auto;max-height:132px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    border-top:1px solid var(--line);padding:6px 12px;
+    padding-bottom:max(6px,env(safe-area-inset-bottom));
+  }
+  #log:empty::after{content:"반복을 완료하면 기록이 쌓입니다";display:block;color:var(--muted);font-size:13px;padding:11px 4px}
+  .rep{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid rgba(46,60,74,.5);font-size:13px}
+  .rep:last-child{border-bottom:0}
+  .rep .no{
+    width:25px;height:25px;flex:0 0 auto;border-radius:8px;display:grid;place-items:center;
+    font-weight:700;font-size:11.5px;background:var(--surface-2);color:var(--muted);font-variant-numeric:tabular-nums;
+  }
+  .rep.ok .no{background:rgba(79,227,166,.16);color:var(--good)}
+  .rep.ng .no{background:rgba(255,180,84,.16);color:var(--warn)}
+  .rep .txt{flex:1;line-height:1.45}
+  .rep .num{color:var(--muted);font-variant-numeric:tabular-nums;font-size:11.5px}
+
+  .metric{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;padding:15px 0;border-bottom:1px solid var(--line)}
+  .metric .name{flex:1;font-size:14.5px;font-weight:600}
+  .metric .num{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .metric .unit{font-size:12px;color:var(--muted);font-weight:600}
+  .metric .why{flex-basis:100%;font-size:12.5px;color:var(--muted);line-height:1.65;margin-top:6px}
+  .metric.derived .num{color:var(--accent)}
+  h3.sec{font-size:12.5px;font-weight:700;color:var(--muted);margin:24px 0 2px}
+  h3.sec:first-child{margin-top:0}
+  .note{
+    font-size:12.5px;color:var(--muted);line-height:1.75;
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;padding:14px 16px;margin-top:20px;text-align:left;
+  }
+  .note b{color:var(--text)}
+  .actions{display:flex;gap:10px;margin-top:22px}
+  .actions button{flex:1}
+
+  .field{padding:15px 0;border-bottom:1px solid var(--line)}
+  .field .row{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+  .field label{font-size:14px;font-weight:600;flex:1}
+  .field .val{font-size:15px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+  .field .desc{font-size:12.5px;color:var(--muted);line-height:1.6;margin-top:8px}
+  input[type=range]{width:100%;accent-color:var(--accent);height:28px}
+  .toggle{display:flex;align-items:center;gap:12px;padding:16px 0;border-bottom:1px solid var(--line)}
+  .toggle label{flex:1;font-size:14px;font-weight:600}
+  input[type=checkbox]{width:22px;height:22px;accent-color:var(--accent)}
+  select{
+    width:100%;background:var(--surface-2);color:var(--text);
+    border:1px solid var(--line);border-radius:10px;
+    padding:12px 13px;font-size:14.5px;font-weight:600;font-family:inherit;
+  }
+  select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* 진단 */
+  table.diag{width:100%;border-collapse:collapse;font-size:13px}
+  table.diag td{padding:10px 0;border-bottom:1px solid var(--line);vertical-align:top}
+  table.diag td:first-child{color:var(--muted);width:42%;font-weight:500}
+  table.diag td:last-child{font-weight:600;word-break:break-word;font-variant-numeric:tabular-nums}
+  .ok{color:var(--good)} .no{color:var(--bad)} .maybe{color:var(--warn)}
+  .banner{
+    border-radius:12px;padding:14px 16px;font-size:13.5px;line-height:1.65;
+    margin-bottom:20px;text-align:left;
+  }
+  .banner.bad{background:rgba(255,122,122,.11);border:1px solid rgba(255,122,122,.32)}
+  .banner.good{background:rgba(79,227,166,.09);border:1px solid rgba(79,227,166,.28)}
+  .banner b{display:block;margin-bottom:5px;font-size:14.5px}
+  code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+    background:var(--surface-2);padding:2px 6px;border-radius:5px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="title">운동 코치 <span id="modeLbl">· 스쿼트</span></div>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="btnBody" aria-label="체형 계측">◱</button>
+    <button class="icon-btn" id="btnFlip" aria-label="카메라 전환">⇄</button>
+    <button class="icon-btn" id="btnDiag" aria-label="진단">!</button>
+    <button class="icon-btn" id="btnSet" aria-label="설정">⚙</button>
+  </header>
+
+  <div id="stage">
+    <video id="cam" playsinline webkit-playsinline muted autoplay disablepictureinpicture></video>
+    <canvas id="overlay"></canvas>
+
+    <div class="hud" id="repBox"><span id="repCount">0</span><span class="lbl" id="repLbl">회</span></div>
+
+    <div class="hud" id="gauge">
+      <span class="hd"></span><span class="hd" style="text-align:right">현재</span><span class="hd" style="text-align:right">목표</span>
+      <span class="k">무릎</span><span class="v" id="vKnee">—</span><span class="t" id="tKnee">—</span>
+      <span class="k">몸통</span><span class="v" id="vTrunk">—</span><span class="t" id="tTrunk">—</span>
+      <span class="k">발목</span><span class="v" id="vAnkle">—</span><span class="t" id="tAnkle">—</span>
+    </div>
+
+    <div id="cue">준비 중<small>카메라를 켜는 중입니다</small></div>
+
+    <!-- 시작 -->
+    <div class="sheet" id="gate">
+      <div class="body"><div class="center">
+        <h1 class="big">운동 자세 코치</h1>
+        <p class="sub" style="font-size:13px;color:var(--accent);font-weight:600">현재 지원 동작 · 스쿼트</p>
+        <p class="sub">먼저 몸을 재고, 그 결과로 판정 기준을 만듭니다. 남의 평균이 아니라 본인 체형에 맞춘 기준입니다.</p>
+        <ol class="steps">
+          <li>폰을 바닥에서 약 1m 높이에 세로로 세웁니다</li>
+          <li>몸의 <b class="hi">옆면</b>이 카메라를 향하게 섭니다</li>
+          <li>발끝부터 머리까지 다 보이게 2~3m 떨어집니다</li>
+        </ol>
+        <div id="envWarn"></div>
+        <button class="primary" id="btnStart">카메라 켜기</button>
+        <p class="fine">영상은 기기 밖으로 나가지 않습니다. 브라우저 안에서만 처리됩니다.</p>
+      </div></div>
+    </div>
+
+    <!-- 계측 안내 -->
+    <div class="sheet" id="calGate" hidden>
+      <div class="body"><div class="center">
+        <h1 class="big">체형 계측</h1>
+        <p class="sub">맨몸으로 <b class="hi">5회</b>만 천천히 앉았다 일어나세요. 아프지 않은 범위까지만, 편한 만큼만 내려가면 됩니다. 깊이를 억지로 만들지 마세요.</p>
+        <p class="fine">이 5회로 대퇴·하퇴 길이와 발목 가동범위를 재고, 거기서 본인의 목표 깊이와 상체 각도를 계산합니다.</p>
+        <button class="primary cal" id="btnCalStart">계측 시작</button>
+        <button class="ghost" id="btnSkipCal">건너뛰고 기본값 사용</button>
+      </div></div>
+    </div>
+
+    <!-- 계측 결과 -->
+    <div class="sheet" id="bodySheet" hidden>
+      <div class="head"><h2>체형 계측 결과</h2><button class="icon-btn" id="btnBodyClose" aria-label="닫기">✕</button></div>
+      <div class="body" id="bodyBody"></div>
+    </div>
+
+    <!-- 진단 -->
+    <div class="sheet" id="diagSheet" hidden>
+      <div class="head"><h2>실행 환경 진단</h2><button class="icon-btn" id="btnDiagClose" aria-label="닫기">✕</button></div>
+      <div class="body" id="diagBody"></div>
+    </div>
+
+    <!-- 설정 -->
+    <div class="sheet" id="setSheet" hidden>
+      <div class="head"><h2>설정</h2><button class="icon-btn" id="btnSetClose" aria-label="닫기">✕</button></div>
+      <div class="body">
+        <div class="field">
+          <div class="row"><label for="selBasis">판정 기준</label></div>
+          <select id="selBasis">
+            <option value="self">본인 계측 기준 (권장)</option>
+            <option value="model">생체역학 모델</option>
+            <option value="fixed">고정값</option>
+          </select>
+          <p class="desc">
+            <b>본인 계측</b>은 계측 5회에서 본인이 실제로 취한 무릎–몸통 곡선을 기준으로 삼습니다. 체형과 성별 차이가 자동으로 반영됩니다.<br>
+            <b>생체역학 모델</b>은 무게중심 평형식으로 매 프레임 계산합니다. 원리는 명확하지만 분절 질량비가 성인 남성 기준이라 사람에 따라 어긋납니다.<br>
+            <b>고정값</b>은 아래 수동 기준을 씁니다. 세 기준을 비교할 때 쓰세요.
+          </p>
+        </div>
+
+        <div class="field">
+          <div class="row"><label for="sTol">허용 오차</label><span class="val" id="wTol">8°</span></div>
+          <input type="range" id="sTol" min="3" max="20" step="1" value="8">
+          <p class="desc">기준 각도에서 이만큼 벗어나도 정상으로 봅니다.</p>
+        </div>
+        <div class="field">
+          <div class="row"><label for="sHeel">뒤꿈치 들림 허용 각도</label><span class="val" id="wHeel">12°</span></div>
+          <input type="range" id="sHeel" min="4" max="30" step="1" value="12">
+          <p class="desc">선 자세의 발 각도를 기준으로, 발이 이보다 더 들리면 경고합니다.
+            발이 흐릿하게 잡히는 프레임에서는 판정을 아예 건너뜁니다.</p>
+        </div>
+        <div class="field">
+          <div class="row"><label for="sTempo">최소 하강 시간</label><span class="val" id="wTempo">0.8초</span></div>
+          <input type="range" id="sTempo" min="0" max="20" step="1" value="8">
+          <p class="desc">이보다 빨리 내려가면 반동으로 판정합니다. 0이면 속도를 보지 않습니다.</p>
+        </div>
+
+        <h3 class="sec">수동 기준 (고정값을 골랐을 때)</h3>
+        <div class="field">
+          <div class="row"><label for="sDepth">목표 깊이</label><span class="val" id="wDepth">95°</span></div>
+          <input type="range" id="sDepth" min="70" max="130" step="5" value="95">
+        </div>
+        <div class="field">
+          <div class="row"><label for="sLean">몸통 기울기 한계</label><span class="val" id="wLean">50°</span></div>
+          <input type="range" id="sLean" min="30" max="75" step="5" value="50">
+        </div>
+
+        <h3 class="sec">성능</h3>
+        <div class="field">
+          <div class="row"><label for="sFps">분석 속도</label><span class="val" id="wFps">24 fps</span></div>
+          <input type="range" id="sFps" min="12" max="60" step="4" value="24">
+          <p class="desc">폰이 뜨거워지거나 끊기면 낮추세요. 낮춰도 판정 정확도는 거의 그대로입니다.</p>
+        </div>
+        <div class="toggle"><label for="cLite">가벼운 모델 사용</label><input type="checkbox" id="cLite"></div>
+        <p class="desc" style="font-size:12.5px;color:var(--muted);line-height:1.6;padding:10px 0 4px">
+          모바일에서는 기본으로 켜집니다. 끄면 정밀하지만 느려지고 발열이 심해집니다. 변경 후 새로고침이 필요합니다.
+        </p>
+
+        <div class="actions">
+          <button class="ghost" id="btnRecal">체형 다시 계측</button>
+          <button class="ghost" id="btnReset">기록 지우기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<script type="module">
+import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+/* ══════════════════════════════════════════════════════════
+   0. 실행 환경 감지
+   ══════════════════════════════════════════════════════════ */
+const UA = navigator.userAgent;
+const ENV = {
+  secure  : window.isSecureContext,
+  proto   : location.protocol,
+  inFrame : window.self !== window.top,
+  ios     : /iPad|iPhone|iPod/.test(UA) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1),
+  android : /Android/.test(UA),
+  safari  : /^((?!chrome|android|crios|fxios).)*safari/i.test(UA),
+  gum     : !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+  webgl   : (()=>{ try{ return !!document.createElement('canvas').getContext('webgl2'); }catch{ return false; } })(),
+  wasm    : typeof WebAssembly==='object',
+  simd    : (()=>{ try{ return WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,123,3,2,1,0,10,10,1,8,0,65,0,253,15,253,98,11])); }catch{ return false; } })(),
+  wake    : 'wakeLock' in navigator
+};
+ENV.mobile = ENV.ios || ENV.android;
+let lastError = null, modelUsed = '—', delegateUsed = '—';
+
+/* ══════════════════════════════════════════════════════════
+   1. 인체측정 상수 (Winter, 양측 사지 합산)
+   ══════════════════════════════════════════════════════════ */
+const ANTHRO = { mFoot:0.0145*2, mShank:0.0465*2, mThigh:0.100*2, pCOM:0.433, hatCOM:0.66 };
+ANTHRO.mHAT = 1 - ANTHRO.mFoot - ANTHRO.mShank - ANTHRO.mThigh;
+const dd = 1 - ANTHRO.pCOM;
+const K = {
+  A : ANTHRO.mShank*dd + ANTHRO.mThigh + ANTHRO.mHAT,
+  B : ANTHRO.mThigh*dd + ANTHRO.mHAT,
+  Tr: ANTHRO.mHAT * ANTHRO.hatCOM,
+  M : 1 - ANTHRO.mFoot
+};
+/* 모델이 요구하는 상체 각도.
+   |s|>1 이면 "몸통만으로는 균형을 못 맞춘다"는 뜻인데, 이는 사람이 실제로
+   넘어진다는 뜻이 아니라 강체 4분절 모델의 한계다(팔의 전방 이동, 여성의
+   낮은 무게중심 등을 담지 못함). 그래서 null 대신 잘라서 돌려주고,
+   범위를 벗어났다는 사실만 따로 알린다. */
+function requiredTrunk(A,B,Tr,Mx){
+  const s=(K.M*Mx - K.A*A + K.B*B)/(K.Tr*Tr);
+  const c=Math.max(-1,Math.min(1,s));
+  return { deg:Math.asin(c)*180/Math.PI, ok:Math.abs(s)<=1.35, s };
+}
+
+/* ══════════════════════════════════════════════════════════
+   2. 설정
+   ══════════════════════════════════════════════════════════ */
+const CFG = { basis:'self', tol:8, heelDeg:12, tempo:0.8, depth:95, lean:50,
+              fps:ENV.mobile?24:30, lite:ENV.mobile };
+const el = id => document.getElementById(id);
+
+/* 현재 동작 이름. 운동을 추가할 때 여기만 바꾸면 화면 표기가 따라간다 */
+const EX = '스쿼트';
+const setMode = s => el('modeLbl').textContent = s ? `· ${EX} · ${s}` : `· ${EX}`;
+const bindRange=(id,out,fmt,set)=>{
+  const s=el(id), o=el(out);
+  const sync=()=>{o.textContent=fmt(+s.value); set(+s.value);};
+  s.addEventListener('input',sync); sync();
+};
+bindRange('sTol','wTol',v=>v+'°',v=>CFG.tol=v);
+bindRange('sHeel','wHeel',v=>v+'°',v=>CFG.heelDeg=v);
+bindRange('sTempo','wTempo',v=>(v/10).toFixed(1)+'초',v=>CFG.tempo=v/10);
+bindRange('sDepth','wDepth',v=>v+'°',v=>CFG.depth=v);
+bindRange('sLean','wLean',v=>v+'°',v=>CFG.lean=v);
+el('sFps').value=CFG.fps;
+bindRange('sFps','wFps',v=>v+' fps',v=>CFG.fps=v);
+el('cLite').checked=CFG.lite;
+el('cLite').addEventListener('change',e=>CFG.lite=e.target.checked);
+el('selBasis').addEventListener('change',e=>CFG.basis=e.target.value);
+
+/* ══════════════════════════════════════════════════════════
+   3. 랜드마크 · 수학
+   ══════════════════════════════════════════════════════════ */
+const L={sh:11,hip:23,knee:25,ank:27,heel:29,toe:31};
+const R={sh:12,hip:24,knee:26,ank:28,heel:30,toe:32};
+const BONES=[['sh','hip'],['hip','knee'],['knee','ank'],['ank','heel'],['heel','toe'],['ank','toe']];
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function angleAt(a,b,c){
+  const u={x:a.x-b.x,y:a.y-b.y}, v={x:c.x-b.x,y:c.y-b.y};
+  const k=(u.x*v.x+u.y*v.y)/((Math.hypot(u.x,u.y)*Math.hypot(v.x,v.y))||1e-6);
+  return Math.acos(Math.max(-1,Math.min(1,k)))*180/Math.PI;
+}
+const ema=(p,n,k=0.3)=>p==null?n:p+(n-p)*k;
+const median=a=>{const s=[...a].sort((x,y)=>x-y);return s.length?s[s.length>>1]:0;};
+
+/* ══════════════════════════════════════════════════════════
+   4. 상태
+   ══════════════════════════════════════════════════════════ */
+const video=el('cam'), canvas=el('overlay'), ctx=canvas.getContext('2d');
+let landmarker=null, stream=null, running=false, lastDetect=0, wakeLock=null;
+let facing = ENV.mobile ? 'user' : 'user';     // 폰을 세워두고 화면을 보려면 전면
+let MODE='idle', curTone='';
+let sKnee=null,sTrunk=null,sAnkle=null,heelBase=null,heelHot=0,lastHeel={};
+let phase='READY', reps=0, rep=null, standFrames=0;
+let BODY=null, calSamples={F:[],T:[],Tr:[],Mx:[]}, calReps=[], calCurve=[];
+
+/* 계측 때 본인이 실제로 취한 무릎-몸통 곡선에서 목표 각도를 읽는다.
+   인구 평균이나 모델 상수가 아니라 본인 데이터라 체형·성별 차이를 그대로 흡수한다. */
+function curveTrunk(kneeA){
+  const c=BODY?.curve; if(!c?.length) return null;
+  if(kneeA>=c[0].knee) return c[0].trunk;
+  if(kneeA<=c[c.length-1].knee) return c[c.length-1].trunk;
+  for(let i=0;i<c.length-1;i++){
+    const a=c[i], b=c[i+1];
+    if(kneeA<=a.knee && kneeA>=b.knee){
+      const f=(a.knee-kneeA)/((a.knee-b.knee)||1e-6);
+      return a.trunk+(b.trunk-a.trunk)*f;
+    }
+  }
+  return null;
+}
+
+/* ══════════════════════════════════════════════════════════
+   5. 카메라 — 단계별로 실패 원인을 남긴다
+   ══════════════════════════════════════════════════════════ */
+async function openCam(){
+  if(!ENV.gum) throw Object.assign(new Error('이 브라우저는 카메라 API를 지원하지 않습니다'),{name:'NoGetUserMedia'});
+  if(!ENV.secure) throw Object.assign(new Error('https가 아니라 카메라를 쓸 수 없습니다'),{name:'InsecureContext'});
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+
+  const tries = [
+    {video:{facingMode:{ideal:facing},width:{ideal:1280},height:{ideal:720}},audio:false},
+    {video:{facingMode:facing},audio:false},
+    {video:true,audio:false}                     // 마지막 보루
+  ];
+  let err=null;
+  for(const c of tries){
+    try{ stream = await navigator.mediaDevices.getUserMedia(c); err=null; break; }
+    catch(e){ err=e; }
+  }
+  if(err) throw err;
+
+  video.srcObject = stream;
+  video.setAttribute('playsinline','');          // iOS 전체화면 강제 진입 방지
+  try{ await video.play(); }catch{ /* 자동재생 속성으로 대개 이미 재생 중 */ }
+
+  if(!video.videoWidth){                         // 메타데이터를 기다린다
+    await new Promise(res=>{
+      const done=()=>{video.removeEventListener('loadedmetadata',done);res();};
+      video.addEventListener('loadedmetadata',done);
+      setTimeout(done,3000);
+    });
+  }
+  fitCanvas();
+  requestWakeLock();
+}
+/* 캔버스의 내부 해상도를 화면에 표시되는 크기와 일치시킨다.
+   이 둘이 어긋나면 골격선이 몸에서 밀려서 그려진다. */
+function fitCanvas(){
+  const r=canvas.getBoundingClientRect(), dpr=Math.min(devicePixelRatio||1,2);
+  const w=Math.max(1,Math.round(r.width*dpr)), h=Math.max(1,Math.round(r.height*dpr));
+  if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; }
+}
+addEventListener('resize',fitCanvas);
+addEventListener('orientationchange',()=>setTimeout(fitCanvas,300));
+/* 창 크기가 그대로여도 카메라 영역은 줄어들 수 있다.
+   아래 기록이 쌓이거나 주소창이 접히면 그렇다. 그때마다 다시 맞춘다. */
+if('ResizeObserver' in window) new ResizeObserver(fitCanvas).observe(canvas);
+
+async function requestWakeLock(){
+  if(!ENV.wake) return;
+  try{ wakeLock = await navigator.wakeLock.request('screen'); }catch{}
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && running) requestWakeLock();
+});
+
+function mapper(){
+  const cw=canvas.width,ch=canvas.height;
+  const vw=video.videoWidth||1280,vh=video.videoHeight||720;
+  const sc=Math.max(cw/vw,ch/vh), dw=vw*sc, dh=vh*sc;
+  const ox=(cw-dw)/2, oy=(ch-dh)/2, mir=facing==='user';
+  return p=>({x:ox+(mir?1-p.x:p.x)*dw, y:oy+p.y*dh});
+}
+
+/* ══════════════════════════════════════════════════════════
+   6. 모델 — GPU 실패 시 CPU로 되돌린다
+   ══════════════════════════════════════════════════════════ */
+async function loadModel(){
+  if(!ENV.wasm) throw Object.assign(new Error('WebAssembly를 지원하지 않는 브라우저입니다'),{name:'NoWasm'});
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  const name = CFG.lite ? 'pose_landmarker_lite' : 'pose_landmarker_full';
+  const path = `https://storage.googleapis.com/mediapipe-models/pose_landmarker/${name}/float16/1/${name}.task`;
+  const base = {
+    runningMode:"VIDEO", numPoses:1,
+    minPoseDetectionConfidence:0.6, minPosePresenceConfidence:0.6, minTrackingConfidence:0.6
+  };
+  for(const delegate of (ENV.webgl ? ['GPU','CPU'] : ['CPU'])){
+    try{
+      landmarker = await PoseLandmarker.createFromOptions(vision,
+        {...base, baseOptions:{modelAssetPath:path, delegate}});
+      modelUsed = CFG.lite?'lite':'full'; delegateUsed = delegate;
+      return;
+    }catch(e){ lastError=e; }
+  }
+  throw Object.assign(new Error('자세 인식 모델을 초기화하지 못했습니다'),{name:'ModelInit'});
+}
+
+function say(t,s,tone){ el('cue').className=tone||''; el('cue').innerHTML=t+(s?`<small>${s}</small>`:''); }
+function gauge(k,tk,tr,ttr,an,tan){
+  el('vKnee').textContent=k; el('tKnee').textContent=tk;
+  el('vTrunk').textContent=tr; el('tTrunk').textContent=ttr;
+  el('vAnkle').textContent=an; el('tAnkle').textContent=tan;
+}
+
+/* ══════════════════════════════════════════════════════════
+   7. 루프 — 모바일 발열을 막으려 프레임을 제한한다
+   ══════════════════════════════════════════════════════════ */
+function loop(){
+  if(!running) return;
+  requestAnimationFrame(loop);
+  const now = performance.now();
+  if(now - lastDetect < 1000/CFG.fps) return;
+  if(video.readyState < 2 || !video.videoWidth) return;
+  lastDetect = now;
+  try{
+    const res = landmarker.detectForVideo(video, now);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(res.landmarks?.length) frame(res.landmarks[0], now);
+    else { say('사람이 보이지 않습니다','전신이 화면에 들어오게 서세요','warn'); soft(); }
+  }catch(e){ lastError=e; }
+}
+function soft(){ sKnee=sTrunk=sAnkle=null; gauge('—','—','—','—','—','—'); }
+
+function frame(lm,t){
+  const ar=(video.videoWidth||16)/(video.videoHeight||9);   // x는 너비, y는 높이로 정규화됨
+  const vis=S=>[S.hip,S.knee,S.ank].reduce((s,i)=>s+(lm[i].visibility??0),0)/3;
+  const S = vis(L)>=vis(R) ? L : R;
+  const P = k => ({x:lm[S[k]].x*ar, y:lm[S[k]].y});
+
+  if(['sh','hip','knee','ank','heel','toe'].some(k=>(lm[S[k]].visibility??0)<0.5)){
+    curTone='warn'; drawSkel(lm,S,'#8698A8');
+    say('몸 전체가 보이지 않습니다','발끝부터 머리까지 화면에 담기게 서세요','warn'); return soft();
+  }
+  const sh=P('sh'),hip=P('hip'),knee=P('knee'),ank=P('ank'),heel=P('heel'),toe=P('toe');
+  const Tr=dist(sh,hip);
+  if(Math.abs(lm[L.sh].x-lm[R.sh].x)*ar/(Tr||1e-6) > 0.62){
+    curTone='warn'; drawSkel(lm,S,'#FFB454');
+    say('옆으로 서 주세요','정면이라 깊이와 기울기를 잴 수 없습니다','warn'); return soft();
+  }
+
+  const dir=Math.sign(toe.x-heel.x)||1;
+  const fwd=(p,q)=>dir*(p.x-q.x);
+  const deg=(f,v)=>Math.atan2(f,v)*180/Math.PI;
+
+  const kneeA=angleAt(hip,knee,ank);
+  const trunkA=deg(fwd(sh,hip),hip.y-sh.y);
+  const ankleA=deg(fwd(knee,ank),ank.y-knee.y);
+  const F=dist(hip,knee), T=dist(knee,ank);
+  const A=fwd(knee,ank), B=-fwd(hip,knee);
+  const mid={x:(heel.x+toe.x)/2,y:(heel.y+toe.y)/2};
+  const Mx=fwd(mid,ank);
+
+  sKnee=ema(sKnee,kneeA); sTrunk=ema(sTrunk,trunkA); sAnkle=ema(sAnkle,ankleA);
+
+  /* ---- 뒤꿈치 들림 ----
+     발 길이로 정규화한 각도로 잰다. 정강이 길이로 나누면 스쿼트 중
+     정강이가 기울면서 값이 같이 흔들려 오탐이 난다.
+     발이 흐릿하면 아예 판정하지 않는다(모르는 것과 뗀 것은 다르다). */
+  const footVis=Math.min(lm[S.heel].visibility??0, lm[S.toe].visibility??0);
+  const footLen=dist(heel,toe);
+  const footOK = footVis>=0.75 && footLen>0.2*T;   // 발이 너무 짧게 잡히면 정면 쪽으로 틀어진 것
+  const footAng = footOK
+    ? Math.asin(Math.max(-1,Math.min(1,(toe.y-heel.y)/(footLen||1e-6))))*180/Math.PI
+    : null;
+
+  const standing=sKnee>158;
+  if(standing){ standFrames++; if(standFrames>8 && footAng!=null) heelBase=ema(heelBase,footAng,0.12); }
+  else standFrames=0;
+
+  const heelRaw = (heelBase==null||footAng==null) ? null : footAng-heelBase;
+  // 한 프레임 튄 값으로는 판정하지 않는다
+  if(heelRaw!=null && heelRaw>CFG.heelDeg) heelHot++; else heelHot=0;
+  const heelLift = heelRaw==null ? null : (heelHot>=4 ? heelRaw : Math.min(heelRaw,CFG.heelDeg));
+  lastHeel = {raw:heelRaw, base:heelBase, ang:footAng, vis:footVis, ok:footOK};
+
+  /* ---- 목표 각도 ---- */
+  const mdl=requiredTrunk(A,B,Tr,Mx);
+  const basis = (CFG.basis==='self'&&BODY?.curve?.length) ? 'self'
+              : (CFG.basis==='fixed'||!BODY) ? 'fixed' : 'model';
+  const tgtTrunk = basis==='self'  ? curveTrunk(sKnee)
+                 : basis==='model' ? mdl.deg + (BODY?.bias??0)
+                 : CFG.lean;
+  const tgtDepth = BODY&&CFG.basis!=='fixed' ? BODY.depth : CFG.depth;
+
+  gauge(Math.round(sKnee)+'°', Math.round(tgtDepth)+'°',
+        Math.round(sTrunk)+'°', tgtTrunk==null?'—':(basis==='fixed'?'≤':'')+Math.round(tgtTrunk)+'°',
+        Math.round(sAnkle)+'°', BODY?Math.round(BODY.ankleROM)+'°':'—');
+
+  if(MODE==='calibrate') calibrateFrame({F,T,Tr,Mx,heelLift,mdl,t});
+  else if(MODE==='train') trainFrame({heelLift,tgtTrunk,tgtDepth,basis,t});
+
+  drawSkel(lm,S, curTone==='bad'?'#FF7A7A':curTone==='warn'?'#FFB454':curTone==='cal'?'#C58BFF':'#4DA3FF');
+}
+
+/* ══════════════════════════════════════════════════════════
+   8. 계측
+   ══════════════════════════════════════════════════════════ */
+function calibrateFrame({F,T,Tr,Mx,heelLift,mdl,t}){
+  if(sKnee>158){ calSamples.F.push(F); calSamples.T.push(T); calSamples.Tr.push(Tr); calSamples.Mx.push(Mx); }
+  curTone='cal';
+  if(phase==='READY' && sKnee<148){
+    phase='DOWN'; rep={minKnee:sKnee,maxAnkle:sAnkle,maxTrunk:sTrunk,maxHeel:heelLift??0,start:t};
+  } else if(phase==='DOWN'){
+    rep.minKnee=Math.min(rep.minKnee,sKnee);
+    rep.maxAnkle=Math.max(rep.maxAnkle,sAnkle);
+    rep.maxTrunk=Math.max(rep.maxTrunk,sTrunk);
+    if(heelLift!=null) rep.maxHeel=Math.max(rep.maxHeel,heelLift);
+    // 본인이 실제로 취한 자세를 그대로 모아둔다. 이게 나중에 기준선이 된다.
+    calCurve.push({knee:sKnee, trunk:sTrunk, pred:mdl.deg, ok:mdl.ok});
+    if(sKnee>158){
+      phase='READY';
+      if(rep.minKnee<135){
+        calReps.push(rep); el('repCount').textContent=calReps.length;
+        if(calReps.length>=5) return finishCalibration();
+      }
+      rep=null;
+    }
+  }
+  say(`계측 중 · ${calReps.length}/5회`,
+      phase==='DOWN' ? `무릎 ${Math.round(sKnee)}° · 발목 ${Math.round(sAnkle)}°`
+                     : '편한 만큼만 천천히 앉았다 일어나세요','cal');
+}
+
+function finishCalibration(){
+  MODE='idle';
+  const F=median(calSamples.F),T=median(calSamples.T),Tr=median(calSamples.Tr),Mx=median(calSamples.Mx);
+  const clean=calReps.filter(r=>r.maxHeel<=CFG.heelDeg);
+  const used=clean.length?clean:calReps;
+  const ankleROM=Math.max(...used.map(r=>r.maxAnkle));
+  const depth=Math.min(...used.map(r=>r.minKnee));
+  const beta=Math.max(0,180-depth-ankleROM);
+  const trunkNeed=requiredTrunk(T*Math.sin(ankleROM*Math.PI/180), F*Math.sin(beta*Math.PI/180), Tr, Mx);
+
+  /* 무릎 각도 10° 구간마다 본인이 취한 몸통 각도의 중앙값 → 개인 기준선 */
+  const bins=new Map();
+  for(const p of calCurve){
+    const b=Math.round(p.knee/10)*10;
+    if(!bins.has(b)) bins.set(b,[]);
+    bins.get(b).push(p.trunk);
+  }
+  const curve=[...bins.entries()]
+    .filter(([,v])=>v.length>=3)
+    .map(([knee,v])=>({knee, trunk:median(v)}))
+    .sort((a,b)=>b.knee-a.knee);
+
+  /* 모델이 본인 자세에서 몇 도나 빗나갔는지. Winter의 상수는 성인 남성
+     시신 자료라서 여성·아동에서 이 잔차가 커진다. 숫자로 드러내 둔다. */
+  const res=calCurve.filter(p=>p.ok).map(p=>p.trunk-p.pred);
+  const bias=res.length>=10?median(res):0;
+  const outOfRange=calCurve.length?calCurve.filter(p=>!p.ok).length/calCurve.length:0;
+
+  BODY={F,T,Tr,Mx,ratio:F/T,ankleROM,depth:Math.max(70,Math.min(135,depth)),trunkNeed,
+        curve,bias,outOfRange,samples:calCurve.length,
+        heelClean:clean.length,total:calReps.length};
+  renderBody(); el('bodySheet').hidden=false;
+  el('repBox').classList.remove('calib'); el('repLbl').textContent='회';
+  setMode('체형 보정 적용');
+}
+
+/* ══════════════════════════════════════════════════════════
+   9. 훈련
+   ══════════════════════════════════════════════════════════ */
+function trainFrame({heelLift,tgtTrunk,tgtDepth,basis,t}){
+  if(phase==='READY' && sKnee<148){
+    phase='DOWN'; rep={minKnee:sKnee,maxTrunk:sTrunk,maxHeel:heelLift??0,heelSeen:heelLift!=null,
+                       devUp:0,devDown:0,start:t,bottom:t};
+  } else if(phase==='DOWN'){
+    if(sKnee<rep.minKnee){rep.minKnee=sKnee;rep.bottom=t;}
+    rep.maxTrunk=Math.max(rep.maxTrunk,sTrunk);
+    if(heelLift!=null){ rep.maxHeel=Math.max(rep.maxHeel,heelLift); rep.heelSeen=true; }
+    if(tgtTrunk!=null){
+      rep.devUp=Math.max(rep.devUp,sTrunk-tgtTrunk);
+      rep.devDown=Math.max(rep.devDown,tgtTrunk-sTrunk);
+    }
+    if(sKnee>158){ phase='READY'; if(rep.minKnee<135) judge(rep,tgtDepth,basis); rep=null; }
+  }
+
+  const lean = basis==='fixed' ? null : tgtTrunk;
+  let tone='good',head,sub='';
+  if(phase==='DOWN'){
+    if(heelLift!=null && heelLift>CFG.heelDeg){
+      tone='bad'; head='뒤꿈치를 바닥에 붙이세요';
+      sub=`${Math.round(heelLift)}° 들렸습니다 · 허용 ${CFG.heelDeg}°`;
+    }
+    else if(lean!=null && sTrunk-lean>CFG.tol){
+      tone='bad'; head='가슴을 세우세요'; sub=`몸통 ${Math.round(sTrunk)}° · 기준 ${Math.round(lean)}°`;
+    } else if(lean!=null && lean-sTrunk>CFG.tol){
+      tone='warn'; head='상체를 조금 숙이세요'; sub=`몸통 ${Math.round(sTrunk)}° · 기준 ${Math.round(lean)}°`;
+    } else if(basis==='fixed' && sTrunk>CFG.lean){
+      tone='bad'; head='가슴을 세우세요'; sub=`몸통 ${Math.round(sTrunk)}° · 한계 ${CFG.lean}°`;
+    }
+    else if(sKnee>tgtDepth+15){ tone='warn'; head='더 내려가세요'; sub=`무릎 ${Math.round(sKnee)}° · 목표 ${Math.round(tgtDepth)}°`; }
+    else { head='좋습니다'; sub=`무릎 ${Math.round(sKnee)}° · 몸통 ${Math.round(sTrunk)}°`; }
+  } else {
+    tone=''; head = reps===0?'준비되었습니다':`${reps}회 완료`;
+    sub = basis==='self' ? `본인 계측 기준 · 깊이 ${Math.round(tgtDepth)}°`
+        : basis==='model'? `생체역학 모델 기준 · 깊이 ${Math.round(tgtDepth)}°`
+        : '고정 기준 사용 중';
+  }
+  curTone=tone; say(head,sub,tone);
+}
+
+function judge(r,tgtDepth,basis){
+  reps++; el('repCount').textContent=reps;
+  const f=[], descent=(r.bottom-r.start)/1000;
+  if(r.heelSeen && r.maxHeel>CFG.heelDeg) f.push(`뒤꿈치 들림 ${Math.round(r.maxHeel)}°`);
+  if(!r.heelSeen) f.push('발이 안 보여 뒤꿈치 판정 생략');
+  if(basis==='fixed'){ if(r.maxTrunk>CFG.lean) f.push('상체 과도한 숙임'); }
+  else {
+    if(r.devUp>CFG.tol)   f.push(`상체 과도한 숙임 +${Math.round(r.devUp)}°`);
+    if(r.devDown>CFG.tol) f.push(`상체 과도한 세움 −${Math.round(r.devDown)}°`);
+  }
+  if(r.minKnee>tgtDepth+15) f.push('깊이 부족');
+  if(CFG.tempo>0 && descent<CFG.tempo) f.push('하강 속도 과다');
+  const ok=f.length===0, row=document.createElement('div');
+  row.className='rep '+(ok?'ok':'ng');
+  row.innerHTML=`<div class="no">${reps}</div>
+    <div class="txt">${ok?'본인 기준을 모두 만족했습니다':f.join(' · ')}</div>
+    <div class="num">${Math.round(r.minKnee)}° / ${Math.round(r.maxTrunk)}° / ${descent.toFixed(1)}s</div>`;
+  el('log').prepend(row);
+}
+
+/* ══════════════════════════════════════════════════════════
+   10. 계측 결과 화면
+   ══════════════════════════════════════════════════════════ */
+function renderBody(){
+  const b=BODY;
+  const shape=b.ratio>1.30?'대퇴가 상대적으로 긴 편입니다. 균형을 잡으려면 상체를 더 숙일 수밖에 없는 체형이라, 숙였다고 잘못된 자세가 아닙니다.'
+            :b.ratio<1.10?'하퇴가 상대적으로 긴 편입니다. 상체를 비교적 세운 채로 앉을 수 있는 체형입니다.'
+            :'대퇴와 하퇴 길이가 균형 잡힌 편입니다.';
+  const ankle=b.ankleROM<25?'배측굴곡이 제한적입니다. 깊이를 억지로 늘리면 뒤꿈치가 들리거나 허리가 말립니다. 발목 가동성 운동을 먼저 하거나 굽 있는 신발을 쓰세요.'
+            :b.ankleROM>38?'발목이 유연한 편이라 깊은 스쿼트가 가능합니다.'
+            :'일반적인 범위의 발목 가동성입니다.';
+  el('bodyBody').innerHTML=`
+    <h3 class="sec">계측값</h3>
+    <div class="metric"><span class="name">대퇴 / 하퇴 길이비</span><span class="num">${b.ratio.toFixed(2)}</span>
+      <p class="why">${shape}</p></div>
+    <div class="metric"><span class="name">발목 배측굴곡</span><span class="num">${Math.round(b.ankleROM)}</span><span class="unit">도</span>
+      <p class="why">${ankle}</p></div>
+    <h3 class="sec">여기서 계산된 본인 기준</h3>
+    <div class="metric derived"><span class="name">목표 깊이 (무릎 각도)</span><span class="num">${Math.round(b.depth)}</span><span class="unit">도</span>
+      <p class="why">뒤꿈치를 붙인 채 실제로 도달한 가장 깊은 지점입니다. 인구 평균이 아니라 지금 몸이 허용하는 범위예요.</p></div>
+    <div class="metric derived"><span class="name">기준선 구간 수</span><span class="num">${b.curve.length}</span><span class="unit">구간</span>
+      <p class="why">무릎 각도 10° 구간마다 본인이 실제로 취한 몸통 각도를 기록했습니다. 운동 중에는 이 곡선이 목표가 됩니다.
+        ${b.curve.length<3?'구간이 적습니다. 더 천천히 앉았다 일어나면 촘촘해집니다.':''}</p></div>
+    <div class="metric"><span class="name">모델 오차 (관측 − 예측)</span>
+      <span class="num">${b.bias>=0?'+':''}${Math.round(b.bias)}</span><span class="unit">도</span>
+      <p class="why">생체역학 모델이 예측한 상체 각도와 본인이 실제로 취한 각도의 차이입니다.
+        ${Math.abs(b.bias)>12
+          ? '차이가 큽니다. Winter의 분절 질량비가 이 체형에 잘 안 맞는다는 뜻이라, 모델 기준 대신 본인 계측 기준을 쓰는 게 맞습니다.'
+          : '모델과 실제가 비교적 잘 맞습니다.'}
+        ${b.outOfRange>0.2?` 전체 프레임의 ${Math.round(b.outOfRange*100)}%는 모델이 아예 풀지 못하는 자세였습니다.`:''}</p></div>
+    <p class="note"><b>계측 품질</b> — 5회 중 ${b.heelClean}회에서 뒤꿈치가 붙어 있었고, ${b.samples}개 프레임을 기준선에 썼습니다.
+      ${b.heelClean<3?'뒤꿈치가 자주 들렸습니다. 발 뒤에 얇은 판을 받치고 다시 재보세요.':''}<br><br>
+      <b>한계</b> — 분절 질량비는 Winter의 표준 인체측정 데이터이며 성인 남성 시신 연구에서 나온 값입니다.
+      여성·아동·비만인에서는 오차가 있습니다. 위의 「모델 오차」가 그 차이를 실제로 잰 숫자입니다.
+      기본 판정은 모델이 아니라 본인 계측값을 쓰므로 이 오차에 영향을 받지 않습니다.</p>
+    <div class="actions">
+      <button class="primary" id="btnGoTrain" style="flex:2">이 기준으로 운동 시작</button>
+      <button class="ghost" id="btnAgain">다시 계측</button>
+    </div>`;
+  el('btnGoTrain').onclick=()=>{el('bodySheet').hidden=true;startTrain();};
+  el('btnAgain').onclick=()=>{el('bodySheet').hidden=true;startCalibration();};
+}
+
+/* ══════════════════════════════════════════════════════════
+   11. 진단 화면
+   ══════════════════════════════════════════════════════════ */
+function renderDiag(){
+  const yn=(v,g='지원',b='불가')=>v?`<span class="ok">${g}</span>`:`<span class="no">${b}</span>`;
+  let verdict='';
+  if(!ENV.secure){
+    verdict=`<div class="banner bad"><b>여기가 문제입니다</b>
+      현재 주소가 <code>${ENV.proto}</code>라서 브라우저가 카메라를 막고 있습니다.
+      파일을 직접 열었거나 http로 접속한 상태예요. 폰에서는 예외가 없습니다.
+      <code>app.netlify.com/drop</code>에 이 파일을 올리고, 거기서 나온 https 주소로 접속하세요.</div>`;
+  } else if(ENV.inFrame){
+    verdict=`<div class="banner bad"><b>여기가 문제일 수 있습니다</b>
+      이 페이지가 다른 페이지 안에 끼워진 상태(iframe)로 열려 있습니다.
+      바깥 페이지가 카메라 권한을 넘겨주지 않으면 작동하지 않습니다. 주소를 브라우저에서 직접 여세요.</div>`;
+  } else if(lastError){
+    const m={
+      NotAllowedError:'카메라 권한이 거부되었습니다. 주소창 옆 자물쇠(iOS는 「AA」 버튼)에서 카메라를 허용으로 바꾸고 새로고침하세요.',
+      NotFoundError:'사용 가능한 카메라를 찾지 못했습니다.',
+      NotReadableError:'다른 앱이 카메라를 쓰고 있습니다. 카메라·화상통화 앱을 모두 종료하고 다시 시도하세요.',
+      OverconstrainedError:'요청한 해상도를 이 기기가 지원하지 않습니다.',
+      InsecureContext:'https가 아니어서 카메라를 쓸 수 없습니다.',
+      NoGetUserMedia:'이 브라우저가 카메라 API를 지원하지 않습니다. 기본 브라우저(Safari 또는 Chrome)로 여세요.',
+      ModelInit:'자세 인식 모델을 초기화하지 못했습니다. 네트워크 차단이나 기기 메모리 부족일 수 있습니다.'
+    }[lastError.name] || lastError.message;
+    verdict=`<div class="banner bad"><b>${lastError.name}</b>${m}</div>`;
+  } else if(running){
+    verdict=`<div class="banner good"><b>정상 작동 중</b>
+      ${modelUsed} 모델 · ${delegateUsed} 연산 · ${CFG.fps}fps · ${video.videoWidth||0}×${video.videoHeight||0}</div>`;
+  }
+
+  const n=v=>v==null?'—':(Math.round(v*10)/10);
+  const live = running ? `
+    <h3 class="sec">실시간 측정값</h3>
+    <table class="diag">
+      <tr><td>무릎 / 몸통 / 발목</td><td>${n(sKnee)}° / ${n(sTrunk)}° / ${n(sAnkle)}°</td></tr>
+      <tr><td>발 각도 (현재)</td><td>${n(lastHeel.ang)}°</td></tr>
+      <tr><td>발 각도 (선 자세 기준)</td><td>${n(lastHeel.base)}°</td></tr>
+      <tr><td>뒤꿈치 들림</td><td>${lastHeel.raw==null?'<span class="maybe">판정 생략</span>':n(lastHeel.raw)+'° / 허용 '+CFG.heelDeg+'°'}</td></tr>
+      <tr><td>발 인식 신뢰도</td><td>${lastHeel.vis==null?'—':(lastHeel.ok?'<span class="ok">':'<span class="no">')+n(lastHeel.vis*100)+'%</span>'}</td></tr>
+      <tr><td>판정 기준</td><td>${basisLabel()}</td></tr>
+      <tr><td>모델 오차 보정</td><td>${BODY?((BODY.bias>=0?'+':'')+Math.round(BODY.bias)+'°'):'—'}</td></tr>
+    </table>
+    <p class="note">뒤꿈치가 실제로 붙어 있는데 「뒤꿈치 들림」이 뜬다면,
+      선 자세 기준값과 현재 발 각도의 차이를 보세요. 차이가 작은데도 경고가 뜨면 허용 각도를 올리고,
+      발 인식 신뢰도가 낮으면 카메라를 발 쪽에 조금 더 가깝게 두거나 맨발·밝은 신발로 바꿔보세요.</p>` : '';
+
+  el('diagBody').innerHTML = verdict + live + `
+    <h3 class="sec">실행 환경</h3>
+    <table class="diag">
+      <tr><td>접속 프로토콜</td><td>${ENV.secure?`<span class="ok">${ENV.proto} (안전)</span>`:`<span class="no">${ENV.proto} (카메라 불가)</span>`}</td></tr>
+      <tr><td>iframe 안인가</td><td>${ENV.inFrame?'<span class="maybe">예</span>':'<span class="ok">아니오</span>'}</td></tr>
+      <tr><td>카메라 API</td><td>${yn(ENV.gum)}</td></tr>
+      <tr><td>WebGL2 (GPU 가속)</td><td>${yn(ENV.webgl)}</td></tr>
+      <tr><td>WebAssembly</td><td>${yn(ENV.wasm)}</td></tr>
+      <tr><td>WASM SIMD</td><td>${ENV.simd?'<span class="ok">지원</span>':'<span class="maybe">미지원 (느림)</span>'}</td></tr>
+      <tr><td>화면 꺼짐 방지</td><td>${ENV.wake?'<span class="ok">지원</span>':'<span class="maybe">미지원</span>'}</td></tr>
+      <tr><td>기기</td><td>${ENV.ios?'iOS':ENV.android?'Android':'데스크톱'}</td></tr>
+      <tr><td>사용 중인 모델</td><td>${modelUsed} / ${delegateUsed}</td></tr>
+      <tr><td>영상 해상도</td><td>${video.videoWidth||0} × ${video.videoHeight||0}</td></tr>
+      <tr><td>브라우저</td><td style="font-size:11px;font-weight:500">${UA}</td></tr>
+    </table>
+    <p class="note"><b>iOS에서 카메라가 안 열릴 때</b> — Safari에서 설정 › Safari › 카메라 를 「확인」 또는 「허용」으로 바꾸세요.
+    Chrome이나 인앱 브라우저(카카오톡·인스타그램 링크)로 열면 막히는 경우가 많으니, 링크를 복사해 Safari에서 직접 여는 게 확실합니다.</p>`;
+}
+
+/* ══════════════════════════════════════════════════════════
+   12. 모드 전환
+   ══════════════════════════════════════════════════════════ */
+const basisLabel = () =>
+  CFG.basis==='fixed' ? '고정 기준'
+  : !BODY ? '계측 전 · 고정 기준'
+  : CFG.basis==='self' ? (BODY.curve.length?'본인 계측 기준':'계측 부족 · 모델 기준')
+  : '생체역학 모델 기준';
+
+function startCalibration(){
+  calSamples={F:[],T:[],Tr:[],Mx:[]}; calReps=[]; calCurve=[];
+  phase='READY'; rep=null; heelBase=null; heelHot=0; standFrames=0;
+  el('repCount').textContent='0'; el('repLbl').textContent='/ 5';
+  el('repBox').classList.add('calib'); setMode('체형 계측 중');
+  MODE='calibrate';
+}
+function startTrain(){
+  reps=0; rep=null; phase='READY'; heelHot=0;
+  el('repCount').textContent='0'; el('repLbl').textContent='회';
+  el('repBox').classList.remove('calib'); el('log').innerHTML='';
+  setMode(basisLabel());
+  MODE='train';
+}
+
+/* ══════════════════════════════════════════════════════════
+   13. 스켈레톤
+   ══════════════════════════════════════════════════════════ */
+function drawSkel(lm,S,color){
+  const m=mapper();
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.strokeStyle=color; ctx.lineWidth=Math.max(3,canvas.width*0.006);
+  ctx.beginPath();
+  for(const [a,b] of BONES){const p=m(lm[S[a]]),q=m(lm[S[b]]);ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);}
+  ctx.stroke();
+  ctx.fillStyle=color;
+  const rr=Math.max(4,canvas.width*0.009);
+  for(const k of ['sh','hip','knee','ank','heel','toe']){
+    const p=m(lm[S[k]]); ctx.beginPath(); ctx.arc(p.x,p.y,rr,0,Math.PI*2); ctx.fill();
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   14. 조작
+   ══════════════════════════════════════════════════════════ */
+(function preflight(){
+  const w=el('envWarn');
+  if(!ENV.secure){
+    w.innerHTML=`<div class="banner bad"><b>이 주소로는 카메라가 열리지 않습니다</b>
+      현재 <code>${ENV.proto}</code> 로 접속 중입니다. 브라우저는 https에서만 카메라를 허용합니다.
+      파일을 <code>app.netlify.com/drop</code> 에 올린 뒤 나오는 주소로 접속하세요.</div>`;
+  } else if(ENV.inFrame){
+    w.innerHTML=`<div class="banner bad"><b>다른 페이지 안에 끼워져 있습니다</b>
+      주소를 복사해 브라우저에서 직접 열어야 카메라를 쓸 수 있습니다.</div>`;
+  }
+})();
+
+el('btnStart').addEventListener('click', async e=>{
+  const b=e.currentTarget; b.disabled=true; b.textContent='카메라 여는 중…';
+  lastError=null;
+  try{
+    await openCam();                       // 사용자 동작 직후에 호출해야 iOS가 허용한다
+    b.textContent='모델 불러오는 중…';
+    if(!landmarker) await loadModel();
+    el('gate').hidden=true; el('calGate').hidden=false;
+    running=true; loop();
+  }catch(err){
+    lastError=err;
+    b.disabled=false; b.textContent='다시 시도';
+    say('시작하지 못했습니다',err.name||'','bad');
+    renderDiag(); el('diagSheet').hidden=false;
+  }
+});
+el('btnCalStart').addEventListener('click',()=>{el('calGate').hidden=true;startCalibration();});
+el('btnSkipCal').addEventListener('click',()=>{
+  el('calGate').hidden=true; CFG.basis='fixed'; el('selBasis').value='fixed'; startTrain();
+});
+el('btnFlip').addEventListener('click',async()=>{
+  facing = facing==='user'?'environment':'user';
+  try{ if(stream) await openCam(); }catch(e){ lastError=e; renderDiag(); el('diagSheet').hidden=false; }
+});
+el('btnBody').addEventListener('click',()=>{ if(BODY){renderBody();el('bodySheet').hidden=false;} else {el('calGate').hidden=false;} });
+el('btnBodyClose').addEventListener('click',()=>el('bodySheet').hidden=true);
+el('btnDiag').addEventListener('click',()=>{renderDiag();el('diagSheet').hidden=false;});
+el('btnDiagClose').addEventListener('click',()=>el('diagSheet').hidden=true);
+el('btnSet').addEventListener('click',()=>el('setSheet').hidden=false);
+el('btnSetClose').addEventListener('click',()=>{
+  el('setSheet').hidden=true;
+  setMode(basisLabel());
+});
+el('btnRecal').addEventListener('click',()=>{el('setSheet').hidden=true;startCalibration();});
+el('btnReset').addEventListener('click',()=>{el('setSheet').hidden=true;startTrain();});
+</script>
+</body>
+</html>
